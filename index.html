@@ -3,677 +3,412 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#071b25">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="/manifest.json">
 <title>ISLAND SURVIVAL 3D</title>
-
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{width:100%;height:100%;overflow:hidden;background:#76c9e9;color:white;font-family:Arial,sans-serif;touch-action:none}
+html,body{width:100%;height:100%;overflow:hidden;background:#72c8e8;font-family:Arial;color:white;touch-action:none}
 canvas{width:100%;height:100%;display:block}
-#top{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
-.panel{background:#071b25c9;border:1px solid #ffffff44;padding:10px 13px;border-radius:13px;font-size:13px;backdrop-filter:blur(8px);box-shadow:0 4px 15px #0003}
-#resources{line-height:1.8}
-#message{position:absolute;top:105px;left:50%;transform:translateX(-50%);background:#071b25cc;padding:10px 16px;border-radius:12px;font-size:13px;text-align:center;pointer-events:none;white-space:nowrap}
-#controls{position:absolute;bottom:22px;left:18px;right:18px;display:flex;justify-content:space-between;align-items:end;pointer-events:none}
-#stick{width:125px;height:125px;border-radius:50%;background:#ffffff25;border:2px solid #ffffff88;position:relative;pointer-events:auto;backdrop-filter:blur(5px)}
-#knob{width:48px;height:48px;border-radius:50%;background:#ffffffcc;position:absolute;left:36px;top:36px;box-shadow:0 3px 10px #0005}
-#actions{display:flex;gap:10px;pointer-events:auto}
-.action{width:68px;height:68px;border-radius:50%;border:2px solid #ffffffaa;background:#075985dd;color:white;font-weight:bold;font-size:12px;box-shadow:0 4px 12px #0005}
-#help{position:absolute;bottom:160px;left:50%;transform:translateX(-50%);background:#071b25bb;padding:8px 12px;border-radius:10px;font-size:11px;white-space:nowrap;pointer-events:none}
+#top{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;pointer-events:none}
+.panel{background:#071b25cc;padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.7}
+#message{position:absolute;top:100px;left:50%;transform:translateX(-50%);background:#071b25cc;padding:10px 14px;border-radius:12px;font-size:12px;white-space:nowrap}
+#controls{position:absolute;bottom:20px;left:18px;right:18px;display:flex;justify-content:space-between;align-items:end}
+#stick{width:120px;height:120px;border:2px solid #ffffff99;background:#ffffff25;border-radius:50%;position:relative}
+#knob{width:46px;height:46px;background:#ffffffdd;border-radius:50%;position:absolute;left:35px;top:35px}
+#actions{display:flex;gap:10px}
+button{width:66px;height:66px;border-radius:50%;border:2px solid #ffffffaa;background:#075985e8;color:white;font-weight:bold;font-size:11px}
+#help{position:absolute;bottom:150px;left:50%;transform:translateX(-50%);background:#071b25bb;padding:8px;border-radius:9px;font-size:11px;white-space:nowrap}
 </style>
 </head>
-
 <body>
 <canvas id="game"></canvas>
-
 <div id="top">
-  <div class="panel">
-    <b>🏝️ ISLAND SURVIVAL</b><br>
-    <span id="health">❤️ Health: 100</span>
-  </div>
-  <div class="panel" id="resources">🪵 Wood: 0<br>🪨 Stone: 0</div>
+ <div class="panel"><b>🏝️ ISLAND SURVIVAL</b><br>❤️ Health: 100</div>
+ <div class="panel" id="resources">🪵 Wood: 0<br>🪨 Stone: 0</div>
 </div>
-
-<div id="message">Welcome to your tropical island!</div>
-<div id="help">Left joystick: Move • Drag screen: Look around</div>
-
+<div id="message">Explore your tropical island!</div>
+<div id="help">Joystick: Move • Drag screen: Look</div>
 <div id="controls">
-  <div id="stick"><div id="knob"></div></div>
-  <div id="actions">
-    <button class="action" id="collect">COLLECT</button>
-    <button class="action" id="jump">JUMP</button>
-  </div>
+ <div id="stick"><div id="knob"></div></div>
+ <div id="actions">
+  <button id="collect">COLLECT</button>
+  <button id="jump">JUMP</button>
+ </div>
 </div>
 
 <script>
 "use strict";
-
 const canvas=document.getElementById("game");
-const gl=canvas.getContext("webgl",{antialias:true,alpha:false});
+const gl=canvas.getContext("webgl",{antialias:true});
+if(!gl)throw Error("WebGL unavailable");
 
-if(!gl){
-  document.getElementById("message").textContent="WebGL is not supported on this phone.";
-  throw new Error("WebGL unavailable");
-}
-
-const vertexShader=`
+const vs=`
 attribute vec3 aPosition;
-attribute vec3 aColor;
 uniform mat4 uMVP;
 uniform vec3 uColor;
-uniform float uUseColor;
 uniform float uTime;
 uniform float uWave;
-varying vec3 vColor;
-
+uniform float uWind;
 void main(){
-  vec3 p=aPosition;
-  if(uWave>0.5){
-    p.y+=sin(p.x*0.22+uTime*1.3)*0.13;
-    p.y+=cos(p.z*0.19+uTime)*0.10;
-  }
-  gl_Position=uMVP*vec4(p,1.0);
-  vColor=mix(uColor,aColor,uUseColor);
+ vec3 p=aPosition;
+ if(uWave>.5){
+  p.y+=sin(p.x*.22+uTime)*.12+cos(p.z*.2+uTime)*.1;
+ }
+ if(uWind>.5){
+  float bend=max(0.,p.y)*max(0.,p.y);
+  p.x+=sin(uTime*2.+p.y*2.)*.07*bend;
+  p.z+=cos(uTime*1.5+p.y*2.)*.05*bend;
+ }
+ gl_Position=uMVP*vec4(p,1.);
 }`;
-
-const fragmentShader=`
+const fs=`
 precision mediump float;
-varying vec3 vColor;
-void main(){
-  gl_FragColor=vec4(vColor,1.0);
-}`;
-
-function shader(type,source){
-  const s=gl.createShader(type);
-  gl.shaderSource(s,source);
-  gl.compileShader(s);
-  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){
-    throw new Error(gl.getShaderInfoLog(s));
-  }
-  return s;
+uniform vec3 uColor;
+void main(){gl_FragColor=vec4(uColor,1.);}
+`;
+function compile(type,src){
+ const s=gl.createShader(type);
+ gl.shaderSource(s,src);gl.compileShader(s);
+ if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));
+ return s;
 }
+const prog=gl.createProgram();
+gl.attachShader(prog,compile(gl.VERTEX_SHADER,vs));
+gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,fs));
+gl.linkProgram(prog);gl.useProgram(prog);
+if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error("Shader link failed");
 
-const program=gl.createProgram();
-gl.attachShader(program,shader(gl.VERTEX_SHADER,vertexShader));
-gl.attachShader(program,shader(gl.FRAGMENT_SHADER,fragmentShader));
-gl.linkProgram(program);
-
-if(!gl.getProgramParameter(program,gl.LINK_STATUS)){
-  throw new Error(gl.getProgramInfoLog(program));
-}
-
-gl.useProgram(program);
-
-const loc={
-  position:gl.getAttribLocation(program,"aPosition"),
-  color:gl.getAttribLocation(program,"aColor"),
-  mvp:gl.getUniformLocation(program,"uMVP"),
-  base:gl.getUniformLocation(program,"uColor"),
-  use:gl.getUniformLocation(program,"uUseColor"),
-  time:gl.getUniformLocation(program,"uTime"),
-  wave:gl.getUniformLocation(program,"uWave")
+const L={
+ pos:gl.getAttribLocation(prog,"aPosition"),
+ mvp:gl.getUniformLocation(prog,"uMVP"),
+ color:gl.getUniformLocation(prog,"uColor"),
+ time:gl.getUniformLocation(prog,"uTime"),
+ wave:gl.getUniformLocation(prog,"uWave"),
+ wind:gl.getUniformLocation(prog,"uWind")
 };
 
-function makeMesh(vertices,colors=null){
-  const p=gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER,p);
-  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.STATIC_DRAW);
-
-  const c=gl.createBuffer();
-  const colorData=colors||Array(vertices.length).fill(1);
-  gl.bindBuffer(gl.ARRAY_BUFFER,c);
-  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(colorData),gl.STATIC_DRAW);
-
-  return {p,c,count:vertices.length/3};
+function mesh(v){
+ const b=gl.createBuffer();
+ gl.bindBuffer(gl.ARRAY_BUFFER,b);
+ gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(v),gl.STATIC_DRAW);
+ return {b,n:v.length/3};
 }
-
-function cube(){
-  const faces=[
-    [-.5,-.5,.5,.5,-.5,.5,.5,.5,.5,-.5,-.5,.5,.5,.5,.5,-.5,.5,.5],
-    [.5,-.5,-.5,-.5,-.5,-.5,-.5,.5,-.5,.5,-.5,-.5,-.5,.5,-.5,.5,.5,-.5],
-    [-.5,.5,.5,.5,.5,.5,.5,.5,-.5,-.5,.5,.5,.5,-.5,-.5,.5,-.5],
-    [-.5,-.5,-.5,.5,-.5,-.5,.5,-.5,.5,-.5,-.5,-.5,.5,-.5,.5,-.5,-.5,.5],
-    [.5,-.5,.5,.5,-.5,-.5,.5,.5,-.5,.5,-.5,.5,.5,.5,-.5,.5,.5,.5],
-    [-.5,-.5,-.5,-.5,-.5,.5,-.5,.5,.5,-.5,-.5,-.5,-.5,.5,.5,-.5,.5,-.5]
-  ];
-  return makeMesh(faces.flat());
+function box(){
+ const v=[
+ -.5,-.5,.5,.5,-.5,.5,.5,.5,.5,-.5,-.5,.5,.5,.5,.5,-.5,.5,.5,
+ .5,-.5,-.5,-.5,-.5,-.5,-.5,.5,-.5,.5,-.5,-.5,-.5,.5,-.5,.5,.5,-.5,
+ -.5,.5,.5,.5,.5,.5,.5,.5,-.5,-.5,.5,.5,.5,-.5,-.5,.5,-.5,
+ -.5,-.5,-.5,.5,-.5,-.5,.5,-.5,.5,-.5,-.5,-.5,.5,-.5,.5,-.5,-.5,.5,
+ .5,-.5,.5,.5,-.5,-.5,.5,.5,-.5,.5,-.5,.5,.5,.5,-.5,.5,.5,.5,
+ -.5,-.5,-.5,-.5,-.5,.5,-.5,.5,.5,-.5,-.5,-.5,-.5,.5,.5,-.5,.5,-.5
+ ];
+ return mesh(v);
 }
-
 function sphere(){
-  const v=[],rings=12,segments=16;
-  for(let i=0;i<rings;i++){
-    const a=i*Math.PI/rings,b=(i+1)*Math.PI/rings;
-    for(let j=0;j<segments;j++){
-      const c=j*2*Math.PI/segments,d=(j+1)*2*Math.PI/segments;
-      const point=(r,t)=>[
-        Math.sin(r)*Math.cos(t),
-        Math.cos(r),
-        Math.sin(r)*Math.sin(t)
-      ];
-      const p1=point(a,c),p2=point(b,c);
-      const p3=point(b,d),p4=point(a,d);
-      v.push(...p1,...p2,...p3,...p1,...p3,...p4);
-    }
-  }
-  return makeMesh(v);
+ const v=[],n=12,m=16;
+ for(let i=0;i<n;i++)for(let j=0;j<m;j++){
+  const p=(a,b)=>[Math.sin(a)*Math.cos(b),Math.cos(a),Math.sin(a)*Math.sin(b)];
+  const a=i*Math.PI/n,c=(i+1)*Math.PI/n;
+  const b=j*2*Math.PI/m,d=(j+1)*2*Math.PI/m;
+  const A=p(a,b),B=p(c,b),C=p(c,d),D=p(a,d);
+  v.push(...A,...B,...C,...A,...C,...D);
+ }
+ return mesh(v);
 }
-
 function cylinder(){
-  const v=[],n=12;
-  for(let i=0;i<n;i++){
-    const a=i*2*Math.PI/n,b=(i+1)*2*Math.PI/n;
-    const p1=[Math.cos(a)*.5,-.5,Math.sin(a)*.5];
-    const p2=[Math.cos(b)*.5,-.5,Math.sin(b)*.5];
-    const p3=[Math.cos(b)*.5,.5,Math.sin(b)*.5];
-    const p4=[Math.cos(a)*.5,.5,Math.sin(a)*.5];
-    v.push(...p1,...p2,...p3,...p1,...p3,...p4);
-  }
-  return makeMesh(v);
+ const v=[],n=10;
+ for(let i=0;i<n;i++){
+  const a=i*2*Math.PI/n,b=(i+1)*2*Math.PI/n;
+  const A=[Math.cos(a)*.5,-.5,Math.sin(a)*.5];
+  const B=[Math.cos(b)*.5,-.5,Math.sin(b)*.5];
+  const C=[Math.cos(b)*.5,.5,Math.sin(b)*.5];
+  const D=[Math.cos(a)*.5,.5,Math.sin(a)*.5];
+  v.push(...A,...B,...C,...A,...C,...D);
+ }
+ return mesh(v);
 }
-
 function cone(){
-  const v=[],n=12;
-  for(let i=0;i<n;i++){
-    const a=i*2*Math.PI/n,b=(i+1)*2*Math.PI/n;
-    const p1=[Math.cos(a)*.5,-.5,Math.sin(a)*.5];
-    const p2=[Math.cos(b)*.5,-.5,Math.sin(b)*.5];
-    const tip=[0,.5,0];
-    v.push(...p1,...p2,...tip);
-  }
-  return makeMesh(v);
+ const v=[];
+ for(let i=0;i<12;i++){
+  const a=i*Math.PI/6,b=(i+1)*Math.PI/6;
+  v.push(Math.cos(a)*.5,-.5,Math.sin(a)*.5,
+         Math.cos(b)*.5,-.5,Math.sin(b)*.5,0,.5,0);
+ }
+ return mesh(v);
+}
+function leaf(){
+ const v=[];
+ for(let i=0;i<8;i++){
+  const a=i/8,b=(i+1)/8;
+  const p=(t,s)=>[t*2,Math.sin(t*Math.PI)*.4-t*.2,s*(Math.sin(t*Math.PI)*.2+.01)];
+  v.push(...p(a,-1),...p(b,-1),...p(b,1),...p(a,-1),...p(b,1),...p(a,1));
+ }
+ return mesh(v);
+}
+const M={box:box(),sphere:sphere(),cylinder:cylinder(),cone:cone(),leaf:leaf()};
+
+function mul(a,b){
+ const o=new Float32Array(16);
+ for(let c=0;c<4;c++)for(let r=0;r<4;r++)
+ o[c*4+r]=a[r]*b[c*4]+a[4+r]*b[c*4+1]+a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3];
+ return o;
+}
+function perspective(f,aspect,n,far){
+ const t=1/Math.tan(f/2),o=new Float32Array(16);
+ o[0]=t/aspect;o[5]=t;o[10]=(far+n)/(n-far);o[11]=-1;o[14]=2*far*n/(n-far);
+ return o;
+}
+function look(eye,target){
+ let z=[eye[0]-target[0],eye[1]-target[1],eye[2]-target[2]];
+ let l=Math.hypot(...z);z=z.map(v=>v/l);
+ let x=[z[2],0,-z[0]];l=Math.hypot(...x);x=x.map(v=>v/l);
+ let y=[z[1]*x[2]-z[2]*x[1],z[2]*x[0]-z[0]*x[2],z[0]*x[1]-z[1]*x[0]];
+ return new Float32Array([
+ x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,
+ -x[0]*eye[0]-x[1]*eye[1]-x[2]*eye[2],
+ -y[0]*eye[0]-y[1]*eye[1]-y[2]*eye[2],
+ -z[0]*eye[0]-z[1]*eye[1]-z[2]*eye[2],1
+ ]);
+}
+function model(x,y,z,sx,sy,sz,r=0){
+ const c=Math.cos(r),s=Math.sin(r);
+ return new Float32Array([c*sx,0,-s*sx,0,0,sy,0,0,s*sz,0,c*sz,0,x,y,z,1]);
+}
+let now=0;
+function draw(mesh,vp,x,y,z,sx,sy,sz,color,rot=0,wind=false,wave=false){
+ gl.bindBuffer(gl.ARRAY_BUFFER,mesh.b);
+ gl.enableVertexAttribArray(L.pos);
+ gl.vertexAttribPointer(L.pos,3,gl.FLOAT,false,0,0);
+ gl.uniformMatrix4fv(L.mvp,false,mul(vp,model(x,y,z,sx,sy,sz,rot)));
+ gl.uniform3fv(L.color,color);
+ gl.uniform1f(L.time,now);
+ gl.uniform1f(L.wind,wind?1:0);
+ gl.uniform1f(L.wave,wave?1:0);
+ gl.drawArrays(gl.TRIANGLES,0,mesh.n);
+}
+function height(x,z){
+ return .15+1.7*Math.exp(-(x*x+z*z)/105)+.18*Math.sin(x*.45)*Math.cos(z*.4);
+}
+function makeTerrain(){
+ const v=[],step=.7;
+ for(let x=-20;x<20;x+=step)for(let z=-20;z<20;z+=step){
+  if(x*x+z*z>17*17)continue;
+  const p=[[x,z],[x+step,z],[x+step,z+step],[x,z+step]].map(q=>[q[0],height(...q),q[1]]);
+  v.push(...p[0],...p[1],...p[2],...p[0],...p[2],...p[3]);
+ }
+ return mesh(v);
+}
+const ground=makeTerrain();
+const water=mesh([-100,-1.25,-100,100,-1.25,-100,100,-1.25,100,-100,-1.25,-100,100,-1.25,100,-100,-1.25,100]);
+
+const player={x:0,z:0,y:0,jump:0,vx:0,vz:0};
+let yaw=0,pitch=.25,wood=0,stone=0;
+let joystick={x:0,y:0},jumping=false;
+const trees=[],rocks=[],deer=[],birds=[],clouds=[];
+
+for(let i=0;i<34;i++){
+ const a=i*2.4,r=7+(i%7)*1.2;
+ trees.push({x:Math.cos(a)*r,z:Math.sin(a)*r,taken:false});
+}
+for(let i=0;i<20;i++){
+ const a=i*2.7,r=5+(i%7)*1.4;
+ rocks.push({x:Math.cos(a)*r,z:Math.sin(a)*r,taken:false});
+}
+for(let i=0;i<5;i++){
+ deer.push({x:-8+i*3,z:3+(i%2)*4,angle:Math.random()*6,phase:i});
+}
+for(let i=0;i<7;i++){
+ birds.push({x:-20+i*7,y:9+(i%3)*2,z:-10+i*5,speed:2+i%3});
+}
+for(let i=0;i<8;i++){
+ clouds.push({x:-25+i*8,y:13+i%3,z:-25+(i%4)*15,speed:.3+i%3*.12});
 }
 
-// Long curved palm leaf
-function palmLeaf(){
-  const v=[];
-  const steps=8;
-  for(let i=0;i<steps;i++){
-    const t=i/steps,u=(i+1)/steps;
-    const width=t=>Math.sin(Math.PI*t)*.22+.015;
-    const point=(t,side)=>[
-      t*1.9,
-      .38*Math.sin(t*Math.PI)-.20*t,
-      side*width(t)
-    ];
-    v.push(
-      ...point(t,-1),...point(u,-1),...point(u,1),
-      ...point(t,-1),...point(u,1),...point(t,1)
-    );
-  }
-  return makeMesh(v);
+function palm(t,vp){
+ const x=t.x,z=t.z,y=height(x,z),sway=Math.sin(now*1.2+x)*.04;
+ for(let i=0;i<5;i++){
+  draw(M.cylinder,vp,x+sway*i,y+.4+i*.48,z,.29-i*.025,.85,.29-i*.025,[.43,.25,.10],sway);
+ }
+ for(let i=0;i<8;i++){
+  draw(M.leaf,vp,x+sway*5,y+2.8,z,1.5,1,1,i%2?[.13,.43,.12]:[.18,.53,.16],i*Math.PI/4+sway,true);
+ }
 }
-
-const meshes={
-  cube:cube(),
-  sphere:sphere(),
-  cylinder:cylinder(),
-  cone:cone(),
-  leaf:palmLeaf()
-};
-
-function terrainHeight(x,z){
-  const r=Math.sqrt(x*x+z*z);
-  return .15
-    +1.7*Math.exp(-(r*r)/105)
-    +.18*Math.sin(x*.45)*Math.cos(z*.4);
+function animal(d,vp){
+ const y=height(d.x,d.z);
+ const walk=Math.sin(now*5+d.phase)*.12;
+ const turn=d.angle;
+ // Deer body and neck
+ draw(M.sphere,vp,d.x,y+.8,d.z,.8,.42,.38,[.55,.29,.12],turn);
+ draw(M.cylinder,vp,d.x+.35*Math.cos(turn),y+1.12,d.z+.35*Math.sin(turn),.24,.65,.24,[.55,.29,.12],turn);
+ draw(M.sphere,vp,d.x+.5*Math.cos(turn),y+1.48,d.z+.5*Math.sin(turn),.35,.3,.3,[.62,.36,.17],turn);
+ // Face
+ draw(M.sphere,vp,d.x+.72*Math.cos(turn),y+1.45,d.z+.72*Math.sin(turn),.07,.07,.07,[.08,.06,.04]);
+ // Four animated legs
+ for(let i=0;i<4;i++){
+  const side=i<2?-.23:.23;
+  const front=i%2===0?.42:-.42;
+  const swing=Math.sin(now*6+d.phase+i*Math.PI)*.13;
+  draw(M.cylinder,vp,d.x+front*Math.cos(turn)-side*Math.sin(turn),
+   y+.36+walk,d.z+front*Math.sin(turn)+side*Math.cos(turn),
+   .12,.65,.12,[.30,.17,.09],swing);
+ }
+ // Small ears
+ draw(M.cone,vp,d.x+.35,y+1.78,d.z-.25,.13,.35,.13,[.55,.29,.12]);
+ draw(M.cone,vp,d.x+.35,y+1.78,d.z+.25,.13,.35,.13,[.55,.29,.12]);
 }
-
-function terrain(){
-  const v=[],colors=[];
-  const step=.65;
-  for(let x=-20;x<20;x+=step){
-    for(let z=-20;z<20;z+=step){
-      const corners=[
-        [x,z],[x+step,z],[x+step,z+step],[x,z+step]
-      ];
-      if(corners.some(([a,b])=>{
-        const edge=17.5+1.2*Math.sin(a*.7)*Math.cos(b*.6);
-        return a*a+b*b>edge*edge;
-      }))continue;
-
-      const pts=corners.map(([a,b])=>[a,terrainHeight(a,b),b]);
-      const r=Math.sqrt((x+.3)**2+(z+.3)**2);
-
-      let col;
-      if(r>15.2)col=[.84,.73,.49];
-      else if(r>12.2)col=[.35,.52,.20];
-      else if(r>7)col=[.19,.43,.15];
-      else col=[.13,.36,.12];
-
-      const variation=.025*Math.sin(x*2.1+z);
-      col=col.map(c=>Math.max(0,Math.min(1,c+variation)));
-
-      [pts[0],pts[1],pts[2],pts[0],pts[2],pts[3]].forEach(p=>{
-        v.push(...p);
-        colors.push(...col);
-      });
-    }
-  }
-  return makeMesh(v,colors);
+function bird(b,vp){
+ const flap=Math.sin(now*12+b.x)*.3;
+ draw(M.sphere,vp,b.x,b.y,b.z,.25,.16,.35,[.16,.17,.19]);
+ draw(M.leaf,vp,b.x,b.y+.05,b.z,.55,.25,.65,[.12,.13,.16],flap);
+ draw(M.leaf,vp,b.x,b.y+.05,b.z,.55,.25,.65,[.12,.13,.16],-flap);
 }
+function render(ms){
+ now=ms/1000;
+ update(Math.min(.04,(ms-(render.last||ms))/1000));render.last=ms;
+ const ratio=Math.min(devicePixelRatio,1.5);
+ if(canvas.width!==Math.floor(canvas.clientWidth*ratio)||canvas.height!==Math.floor(canvas.clientHeight*ratio)){
+  canvas.width=Math.floor(canvas.clientWidth*ratio);
+  canvas.height=Math.floor(canvas.clientHeight*ratio);
+ }
+ gl.viewport(0,0,canvas.width,canvas.height);
+ gl.enable(gl.DEPTH_TEST);
+ gl.clearColor(.43,.75,.91,1);
+ gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
-const ground=terrain();
+ const target=[player.x,player.y+1.2+player.jump,player.z];
+ const eye=[target[0]+Math.sin(yaw)*10*Math.cos(pitch),target[1]+10*Math.sin(pitch)+2,target[2]+Math.cos(yaw)*10*Math.cos(pitch)];
+ const vp=mul(perspective(1,canvas.width/canvas.height,.1,180),look(eye,target));
 
-const water=makeMesh([
-  -100,-1.25,-100,100,-1.25,-100,100,-1.25,100,
-  -100,-1.25,-100,100,-1.25,100,-100,-1.25,100
-]);
+ draw(water,vp,0,0,0,1,1,1,[.02,.32,.54],0,false,true);
+ draw(ground,vp,0,0,0,1,1,1,[.20,.42,.16]);
+ // Mountain background
+ draw(M.cone,vp,-12,3,-12,12,9,10,[.34,.46,.39],.3);
+ draw(M.cone,vp,-8,7,-14,4,5,4,[.66,.69,.62]);
+ draw(M.cone,vp,12,3,-13,11,8,10,[.34,.46,.39],.4);
+ draw(M.cone,vp,12,7,-13,3,4,3,[.67,.70,.65]);
 
-function multiply(a,b){
-  const o=new Float32Array(16);
-  for(let c=0;c<4;c++)for(let r=0;r<4;r++){
-    o[c*4+r]=a[r]*b[c*4]+a[4+r]*b[c*4+1]+
-    a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3];
-  }
-  return o;
+ clouds.forEach(c=>{
+  draw(M.sphere,vp,c.x,c.y,c.z,2.5,.8,1.5,[.97,.99,1]);
+  draw(M.sphere,vp,c.x+1,c.y+.3,c.z,1.5,.8,1.2,[1,1,1]);
+ });
+ birds.forEach(b=>bird(b,vp));
+ trees.forEach(t=>{if(!t.taken)palm(t,vp);});
+ rocks.forEach(r=>{
+  if(!r.taken)draw(M.sphere,vp,r.x,height(r.x,r.z)+.35,r.z,.8,.6,.8,[.46,.48,.48]);
+ });
+ deer.forEach(d=>animal(d,vp));
+
+ // Player body and animated limbs
+ const x=player.x,z=player.z,y=player.y+player.jump;
+ const moving=Math.hypot(player.vx,player.vz)>.3;
+ const swing=moving?Math.sin(now*10)*.48:Math.sin(now*1.5)*.025;
+ draw(M.box,vp,x,y+.95,z,.58,.85,.38,[.08,.25,.75]);
+ draw(M.sphere,vp,x,y+1.55,z,.38,.38,.38,[.86,.63,.43]);
+ // Arms
+ draw(M.cylinder,vp,x-.4,y+1.0,z,.16,.65,.16,[.82,.56,.37],swing);
+ draw(M.cylinder,vp,x+.4,y+1.0,z,.16,.65,.16,[.82,.56,.37],-swing);
+ // Legs
+ draw(M.cylinder,vp,x-.17,y+.27,z,.18,.55,.18,[.12,.12,.17],-swing);
+ draw(M.cylinder,vp,x+.17,y+.27,z,.18,.55,.18,[.12,.12,.17],swing);
+ draw(M.sphere,vp,-18,20,-35,3,3,3,[1,.88,.48]);
+
+ requestAnimationFrame(render);
 }
-
-function perspective(fov,aspect,near,far){
-  const f=1/Math.tan(fov/2),o=new Float32Array(16);
-  o[0]=f/aspect;o[5]=f;
-  o[10]=(far+near)/(near-far);
-  o[11]=-1;
-  o[14]=(2*far*near)/(near-far);
-  return o;
-}
-
-function lookAt(eye,target){
-  let zx=eye[0]-target[0],zy=eye[1]-target[1],zz=eye[2]-target[2];
-  let l=Math.hypot(zx,zy,zz);
-  zx/=l;zy/=l;zz/=l;
-
-  let xx=zz,xy=0,xz=-zx;
-  l=Math.hypot(xx,xy,xz);
-  xx/=l;xy/=l;xz/=l;
-
-  const yx=zy*xz-zz*xy;
-  const yy=zz*xx-zx*xz;
-  const yz=zx*xy-zy*xx;
-
-  return new Float32Array([
-    xx,yx,zx,0,xy,yy,zy,0,xz,yz,zz,0,
-    -(xx*eye[0]+xy*eye[1]+xz*eye[2]),
-    -(yx*eye[0]+yy*eye[1]+yz*eye[2]),
-    -(zx*eye[0]+zy*eye[1]+zz*eye[2]),1
-  ]);
-}
-
-function model(x,y,z,sx,sy,sz,rotation=0){
-  const c=Math.cos(rotation),s=Math.sin(rotation);
-  return new Float32Array([
-    c*sx,0,-s*sx,0,
-    0,sy,0,0,
-    s*sz,0,c*sz,0,
-    x,y,z,1
-  ]);
-}
-
-let currentTime=0;
-
-function draw(mesh,mvp,color,vertexColors=false,wave=false){
-  gl.bindBuffer(gl.ARRAY_BUFFER,mesh.p);
-  gl.enableVertexAttribArray(loc.position);
-  gl.vertexAttribPointer(loc.position,3,gl.FLOAT,false,0,0);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER,mesh.c);
-  gl.enableVertexAttribArray(loc.color);
-  gl.vertexAttribPointer(loc.color,3,gl.FLOAT,false,0,0);
-
-  gl.uniformMatrix4fv(loc.mvp,false,mvp);
-  gl.uniform3fv(loc.base,color);
-  gl.uniform1f(loc.use,vertexColors?1:0);
-  gl.uniform1f(loc.time,currentTime);
-  gl.uniform1f(loc.wave,wave?1:0);
-
-  gl.drawArrays(gl.TRIANGLES,0,mesh.count);
-}
-
-function drawObject(mesh,x,y,z,sx,sy,sz,color,vp,rot=0){
-  const m=model(x,y,z,sx,sy,sz,rot);
-  draw(mesh,multiply(vp,m),color);
-}
-
-const player={
-  x:0,z:0,y:0,jump:0,
-  vx:0,vz:0
-};
-
-let yaw=0,pitch=.25;
-let wood=0,stone=0;
-let joystick={x:0,y:0};
-let jumping=false,lastTime=0;
-
-const objects=[];
-const clouds=[];
-
-function addTree(x,z){
-  objects.push({type:"tree",x,z,taken:false});
-}
-function addRock(x,z){
-  objects.push({type:"rock",x,z,taken:false});
-}
-
-// Tropical palm forest
-for(let i=0;i<43;i++){
-  const a=i*2.399;
-  const r=7+(i%8)*1.12;
-  addTree(Math.cos(a)*r,Math.sin(a)*r);
-}
-
-// Rocks
-for(let i=0;i<22;i++){
-  const a=i*2.73;
-  const r=5+(i%7)*1.45;
-  addRock(Math.cos(a)*r,Math.sin(a)*r);
-}
-
-// Clouds
-for(let i=0;i<9;i++){
-  clouds.push({
-    x:(i%3)*20-20,
-    y:12+(i%4)*2,
-    z:Math.floor(i/3)*18-18,
-    speed:.35+(i%3)*.12,
-    size:1.5+(i%3)*.5
-  });
-}
-
-function drawPalm(x,z,vp){
-  const y=terrainHeight(x,z);
-  const sway=Math.sin(currentTime*1.1+x)*.035;
-
-  // Segmented curved trunk
-  for(let i=0;i<5;i++){
-    const t=i/5;
-    drawObject(
-      meshes.cylinder,
-      x+sway*t*3,
-      y+.45+i*.48,
-      z,
-      .32-i*.025,.85,.32-i*.025,
-      [.43,.25,.10],vp,sway
-    );
-  }
-
-  const topX=x+sway*3;
-  const topY=y+2.8;
-
-  drawObject(meshes.sphere,topX,topY,z,.3,.28,.3,[.35,.20,.08],vp);
-
-  // Eight long green palm leaves
-  for(let i=0;i<8;i++){
-    const angle=i*Math.PI/4;
-    const leafRot=angle+sway;
-    const green=i%2===0?[.12,.43,.13]:[.17,.52,.16];
-    drawObject(
-      meshes.leaf,topX,topY,z,
-      1.45,1.0,1.0,green,vp,leafRot
-    );
-  }
-}
-
-function drawMountains(vp){
-  // Distant island mountain peaks
-  drawObject(meshes.cone,-13,3,-11,12,9,10,[.32,.43,.39],vp,.2);
-  drawObject(meshes.cone,-8,4,-13,9,12,9,[.40,.49,.43],vp,.5);
-  drawObject(meshes.cone,12,3,-13,11,8,10,[.34,.46,.40],vp,.3);
-
-  // Rocky upper peaks
-  drawObject(meshes.cone,-8,8,-13,3.5,4,3.5,[.64,.68,.62],vp,.5);
-  drawObject(meshes.cone,12,7,-13,3.2,3.5,3.2,[.67,.70,.65],vp,.3);
-}
-
-function drawCloud(cloud,vp){
-  const x=cloud.x,y=cloud.y,z=cloud.z,s=cloud.size;
-  drawObject(meshes.sphere,x,y,z,s*1.5,s*.55,s,[.97,.99,1],vp);
-  drawObject(meshes.sphere,x+s*.8,y+.2,z,s,s*.65,s*.8,[1,1,1],vp);
-  drawObject(meshes.sphere,x-s*.8,y+.1,z,s*.9,s*.5,s*.8,[.95,.98,1],vp);
-}
-
-function render(time){
-  const dt=Math.min((time-lastTime)/1000,.04);
-  lastTime=time;
-  currentTime=time/1000;
-
-  update(dt);
-
-  const w=canvas.clientWidth;
-  const h=canvas.clientHeight;
-
-  if(canvas.width!==Math.floor(w*devicePixelRatio)||
-     canvas.height!==Math.floor(h*devicePixelRatio)){
-    // Limit rendering resolution for smoother performance on phones
-    const ratio=Math.min(devicePixelRatio,1.5);
-    canvas.width=Math.floor(w*ratio);
-    canvas.height=Math.floor(h*ratio);
-    gl.viewport(0,0,canvas.width,canvas.height);
-  }
-
-  gl.enable(gl.DEPTH_TEST);
-  gl.clearColor(.43,.75,.91,1);
-  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-
-  const target=[
-    player.x,player.y+1.15+player.jump,player.z
-  ];
-
-  const distance=10;
-  const eye=[
-    target[0]+Math.sin(yaw)*Math.cos(pitch)*distance,
-    target[1]+Math.sin(pitch)*distance+2,
-    target[2]+Math.cos(yaw)*Math.cos(pitch)*distance
-  ];
-
-  const view=lookAt(eye,target);
-  const proj=perspective(1.0,canvas.width/canvas.height,.1,180);
-  const vp=multiply(proj,view);
-
-  // Animated blue ocean
-  draw(water,vp,[.025,.34,.55],false,true);
-
-  // Island terrain
-  draw(ground,vp,[1,1,1],true);
-
-  drawMountains(vp);
-
-  // Moving clouds
-  clouds.forEach(c=>{
-    drawCloud(c,vp);
-  });
-
-  // Trees and rocks
-  objects.forEach(o=>{
-    if(o.taken)return;
-    if(o.type==="tree"){
-      drawPalm(o.x,o.z,vp);
-    }else{
-      const y=terrainHeight(o.x,o.z);
-      drawObject(
-        meshes.sphere,o.x,y+.35,o.z,
-        .8,.65,.8,[.43,.46,.48],vp
-      );
-      drawObject(
-        meshes.sphere,o.x+.18,y+.62,o.z-.12,
-        .35,.25,.35,[.55,.57,.56],vp
-      );
-    }
-  });
-
-  // Sun
-  drawObject(meshes.sphere,-18,20,-35,3,3,3,[1,.88,.48],vp);
-
-  // Player
-  const py=player.y+player.jump;
-  drawObject(meshes.cube,player.x,py+.9,player.z,.65,1,.4,[.08,.28,.8],vp);
-  drawObject(meshes.sphere,player.x,py+1.65,player.z,.48,.48,.48,[.88,.65,.43],vp);
-  drawObject(meshes.cube,player.x-.18,py+.25,player.z,.2,.5,.25,[.12,.12,.18],vp);
-  drawObject(meshes.cube,player.x+.18,py+.25,player.z,.2,.5,.25,[.12,.12,.18],vp);
-
-  requestAnimationFrame(render);
-}
-
 function update(dt){
-  let forward=-joystick.y;
-  let side=joystick.x;
+ let f=-joystick.y,s=joystick.x;
+ if(keys.w||keys.arrowup)f=1;
+ if(keys.s||keys.arrowdown)f=-1;
+ if(keys.a||keys.arrowleft)s=-1;
+ if(keys.d||keys.arrowright)s=1;
+ const len=Math.hypot(f,s);
+ if(len>1){f/=len;s/=len;}
+ const speed=4.5;
+ const vx=(Math.sin(yaw)*f+Math.cos(yaw)*s)*speed;
+ const vz=(-Math.cos(yaw)*f+Math.sin(yaw)*s)*speed;
+ player.vx+=(vx-player.vx)*Math.min(1,dt*8);
+ player.vz+=(vz-player.vz)*Math.min(1,dt*8);
+ player.x+=player.vx*dt;player.z+=player.vz*dt;
+ const r=Math.hypot(player.x,player.z);
+ if(r>16.5){player.x*=16.5/r;player.z*=16.5/r;}
+ player.y=height(player.x,player.z);
+ if(jumping){player.jump+=dt*5;if(player.jump>1.3)jumping=false;}
+ else player.jump=Math.max(0,player.jump-dt*5);
 
-  if(keys["w"]||keys["arrowup"])forward=1;
-  if(keys["s"]||keys["arrowdown"])forward=-1;
-  if(keys["a"]||keys["arrowleft"])side=-1;
-  if(keys["d"]||keys["arrowright"])side=1;
-
-  const length=Math.hypot(forward,side);
-  if(length>1){forward/=length;side/=length;}
-
-  const speed=5;
-  const targetVX=(Math.sin(yaw)*forward+Math.cos(yaw)*side)*speed;
-  const targetVZ=(-Math.cos(yaw)*forward+Math.sin(yaw)*side)*speed;
-
-  // Smooth acceleration and stopping
-  const smooth=Math.min(1,dt*8);
-  player.vx+=(targetVX-player.vx)*smooth;
-  player.vz+=(targetVZ-player.vz)*smooth;
-
-  player.x+=player.vx*dt;
-  player.z+=player.vz*dt;
-
-  const r=Math.hypot(player.x,player.z);
-  if(r>17){
-    player.x*=17/r;
-    player.z*=17/r;
-    player.vx*=.2;
-    player.vz*=.2;
-  }
-
-  player.y=terrainHeight(player.x,player.z);
-
-  if(jumping){
-    player.jump+=dt*5;
-    if(player.jump>1.3)jumping=false;
-  }else if(player.jump>0){
-    player.jump=Math.max(0,player.jump-dt*5);
-  }
-
-  // Cloud movement
-  clouds.forEach(c=>{
-    c.x+=c.speed*dt;
-    if(c.x>35)c.x=-35;
-  });
+ clouds.forEach(c=>{c.x+=c.speed*dt;if(c.x>35)c.x=-35;});
+ birds.forEach(b=>{b.x+=b.speed*dt;if(b.x>30)b.x=-30;});
+ deer.forEach(d=>{
+  d.x+=Math.cos(d.angle)*dt*.45;
+  d.z+=Math.sin(d.angle)*dt*.45;
+  if(Math.random()<.006)d.angle+=(Math.random()-.5)*2;
+  if(Math.hypot(d.x,d.z)>12)d.angle=Math.atan2(-d.z,-d.x);
+ });
 }
-
 const keys={};
 window.addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
 window.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
-const stick=document.getElementById("stick");
-const knob=document.getElementById("knob");
-let stickPointer=null;
-
-stick.addEventListener("pointerdown",e=>{
-  stickPointer=e.pointerId;
-  stick.setPointerCapture(e.pointerId);
-  moveStick(e);
-});
-
-stick.addEventListener("pointermove",e=>{
-  if(e.pointerId===stickPointer)moveStick(e);
-});
-
+const stick=document.getElementById("stick"),knob=document.getElementById("knob");
+let stickId=null;
+stick.addEventListener("pointerdown",e=>{stickId=e.pointerId;stick.setPointerCapture(e.pointerId);moveStick(e);});
+stick.addEventListener("pointermove",e=>{if(e.pointerId===stickId)moveStick(e);});
 function moveStick(e){
-  const r=stick.getBoundingClientRect();
-  let x=e.clientX-(r.left+r.width/2);
-  let y=e.clientY-(r.top+r.height/2);
-  const max=38;
-  const len=Math.hypot(x,y);
-  if(len>max){x=x/len*max;y=y/len*max;}
-  joystick={x:x/max,y:y/max};
-  knob.style.transform=`translate(${x}px,${y}px)`;
+ const r=stick.getBoundingClientRect();
+ let x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2;
+ const len=Math.hypot(x,y),max=36;
+ if(len>max){x=x/len*max;y=y/len*max;}
+ joystick={x:x/max,y:y/max};
+ knob.style.transform=`translate(${x}px,${y}px)`;
 }
+function resetStick(){stickId=null;joystick={x:0,y:0};knob.style.transform="translate(0,0)";}
+stick.addEventListener("pointerup",resetStick);
+stick.addEventListener("pointercancel",resetStick);
 
-function releaseStick(){
-  stickPointer=null;
-  joystick={x:0,y:0};
-  knob.style.transform="translate(0,0)";
-}
-
-stick.addEventListener("pointerup",releaseStick);
-stick.addEventListener("pointercancel",releaseStick);
-
-let lookPointer=null,lastX=0,lastY=0;
-
-canvas.addEventListener("pointerdown",e=>{
-  lookPointer=e.pointerId;
-  lastX=e.clientX;
-  lastY=e.clientY;
-  canvas.setPointerCapture(e.pointerId);
-});
-
+let lookId=null,lastX=0,lastY=0;
+canvas.addEventListener("pointerdown",e=>{lookId=e.pointerId;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId);});
 canvas.addEventListener("pointermove",e=>{
-  if(e.pointerId!==lookPointer)return;
-  yaw-=(e.clientX-lastX)*.007;
-  pitch=Math.max(-.15,Math.min(.8,pitch+(e.clientY-lastY)*.005));
-  lastX=e.clientX;
-  lastY=e.clientY;
+ if(e.pointerId!==lookId)return;
+ yaw-=(e.clientX-lastX)*.007;
+ pitch=Math.max(-.15,Math.min(.8,pitch+(e.clientY-lastY)*.005));
+ lastX=e.clientX;lastY=e.clientY;
 });
-
-canvas.addEventListener("pointerup",()=>lookPointer=null);
-canvas.addEventListener("pointercancel",()=>lookPointer=null);
-
-document.getElementById("jump").onclick=()=>{
-  if(player.jump===0)jumping=true;
-};
-
-document.getElementById("collect").onclick=()=>{
-  let nearest=null,best=2.5;
-
-  for(const o of objects){
-    if(o.taken)continue;
-    const d=Math.hypot(player.x-o.x,player.z-o.z);
-    if(d<best){best=d;nearest=o;}
-  }
-
-  if(!nearest){
-    showMessage("Move closer to a tree or rock!");
-    return;
-  }
-
-  nearest.taken=true;
-
-  if(nearest.type==="tree")wood++;
-  else stone++;
-
-  document.getElementById("resources").innerHTML=
-    "🪵 Wood: "+wood+"<br>🪨 Stone: "+stone;
-
-  showMessage(nearest.type==="tree"?
-    "You collected wood!":"You collected stone!");
-};
+canvas.addEventListener("pointerup",()=>lookId=null);
+canvas.addEventListener("pointercancel",()=>lookId=null);
 
 let messageTimer;
-
-function showMessage(text){
-  const box=document.getElementById("message");
-  box.textContent=text;
-  clearTimeout(messageTimer);
-  messageTimer=setTimeout(()=>{
-    box.textContent="Explore your beautiful island!";
-  },2200);
+function message(t){
+ const el=document.getElementById("message");el.textContent=t;
+ clearTimeout(messageTimer);
+ messageTimer=setTimeout(()=>el.textContent="Explore your tropical island!",2200);
 }
-
+document.getElementById("jump").onclick=()=>{if(player.jump===0)jumping=true;};
+document.getElementById("collect").onclick=()=>{
+ let found=null,best=2.5;
+ for(const t of trees)if(!t.taken){
+  const d=Math.hypot(player.x-t.x,player.z-t.z);
+  if(d<best){best=d;found=t;}
+ }
+ let rock=null;
+ for(const r of rocks)if(!r.taken){
+  const d=Math.hypot(player.x-r.x,player.z-r.z);
+  if(d<best){best=d;found=r;rock=r;}
+ }
+ if(!found){message("Move closer to a tree or rock!");return;}
+ found.taken=true;
+ if(rock){stone++;message("You collected stone!");}
+ else{wood++;message("You collected wood!");}
+ document.getElementById("resources").innerHTML="🪵 Wood: "+wood+"<br>🪨 Stone: "+stone;
+};
 document.addEventListener("contextmenu",e=>e.preventDefault());
-
 requestAnimationFrame(render);
 </script>
 
 <script>
 if("serviceWorker" in navigator){
-  window.addEventListener("load",()=>{
-    navigator.serviceWorker.register("/sw.js")
-      .catch(error=>console.error("Offline setup failed:",error));
-  });
+ window.addEventListener("load",()=>{
+  navigator.serviceWorker.register("/sw.js").catch(console.error);
+ });
 }
 </script>
 </body>
